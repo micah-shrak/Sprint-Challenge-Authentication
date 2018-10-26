@@ -1,6 +1,6 @@
 const axios = require('axios');
 
-const { authenticate } = require('./middlewares');
+const { authenticate, generateToken } = require('./middlewares');
 
 const bcrypt = require('bcryptjs');
 
@@ -20,8 +20,13 @@ function sanityCheck(req, res) {
 
 function register(req, res) {
 	// implement user registration
+	// get credentials from request body
 	const creds = req.body;
+
+	// hash the password using bcrypt
 	const hash = bcrypt.hashSync(creds.password, 10);
+
+	// set password to created hash
 	creds.password = hash;
 
 	db('users')
@@ -37,6 +42,23 @@ function register(req, res) {
 
 function login(req, res) {
 	// implement user login
+	const creds = req.body;
+
+	db('users')
+		.where({ username: creds.username })
+		.first()
+		.then((user) => {
+			if (user && bcrypt.compareSync(creds.password, user.password)) {
+				const token = generateToken(user);
+				req.headers.authorization = token;
+				res.status(200).json({ welcome: user.username, token });
+			} else {
+				res.status(401).json({ message: 'Not authorized' });
+			}
+		})
+		.catch((err) => {
+			res.status(500).json({ err });
+		});
 }
 
 function getJokes(req, res) {
